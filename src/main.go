@@ -71,7 +71,8 @@ func parse(link string) {
 	wf.Cache.StoreJSON(cacheKey, meta)
 	meta.Title = pureTitle(meta.Title)
 
-	wf.NewItem(fmt.Sprintf("%s [%s]", meta.Title, meta.SiteName)).Subtitle(meta.Description).Valid(true).Var("url", link).Var("title", meta.Title).Var("description", meta.Description).Var("image", meta.Image).Var("siteName", meta.SiteName).Quicklook(link)
+	item := wf.NewItem(fmt.Sprintf("%s [%s]", meta.Title, meta.SiteName)).Subtitle(meta.Description).Valid(true).Var("url", link).Var("title", meta.Title).Var("description", meta.Description).Var("image", meta.Image).Var("siteName", meta.SiteName).Quicklook(link)
+	item.Ctrl().Subtitle("复制到 Markdown")
 	wf.SendFeedback()
 }
 
