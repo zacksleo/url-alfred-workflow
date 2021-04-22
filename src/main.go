@@ -8,6 +8,7 @@ package main
 
 import (
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -60,15 +61,7 @@ func parse(link string) {
 
 	if wf.Cache.Expired(cacheKey, maxCacheAge) {
 
-		client := &http.Client{}
-		req, err := http.NewRequest("GET", link, nil)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.128 Safari/537.36")
-
-		resp, err := client.Do(req)
+		resp, err := Get(link)
 
 		if err != nil {
 			wf.NewItem("error").Subtitle(err.Error())
@@ -80,11 +73,27 @@ func parse(link string) {
 	}
 
 	wf.Cache.StoreJSON(cacheKey, meta)
-	meta.Title = pureTitle(meta.Title)
-
-	item := wf.NewItem(fmt.Sprintf("%s [%s]", meta.Title, meta.SiteName)).Subtitle(pureDescription(meta.Description)).Valid(true).Var("url", link).Var("title", meta.Title).Var("description", pureDescription(meta.Description)).Var("image", meta.Image).Var("siteName", meta.SiteName).Quicklook(link)
+	meta.Title = cleanBreak(pureTitle(meta.Title))
+	meta.Description = cleanBreak(meta.Description)
+	item := wf.NewItem(fmt.Sprintf("%s [%s]", meta.Title, meta.SiteName)).Subtitle(meta.Description).Valid(true).Var("url", link).Var("title", meta.Title).Var("description", meta.Description).Var("image", meta.Image).Var("siteName", meta.SiteName).Quicklook(link)
 	item.Ctrl().Subtitle("复制到 Markdown")
 	wf.SendFeedback()
+}
+
+func Get(url string) (resp *http.Response, err error) {
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.128 Safari/537.36")
+
+	return client.Do(req)
 }
 
 func getMd5(text string) string {
@@ -181,16 +190,19 @@ func pureTitle(title string) string {
 	return strings.Join(ss[:len(ss)-1], "")
 }
 
-func pureDescription(description string) string {
+func cleanBreak(description string) string {
 	re := regexp.MustCompile(`[\r\n\s]+`)
 	str := re.ReplaceAllString(description, " ")
 	return str
 }
 
 func parseSiteNameFromTitle(title string) string {
-	str := strings.ReplaceAll(title, "_", "-")
+	str := strings.ReplaceAll(cleanBreak(title), "_", "-")
 	str = strings.ReplaceAll(str, " ", "")
+	str = strings.ReplaceAll(str, "－", "-")
+	str = strings.ReplaceAll(str, "|", "-")
 	ss := strings.Split(str, "-")
+	log.Printf("str=%s\n", str)
 	return ss[len(ss)-1]
 }
 
