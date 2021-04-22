@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -58,7 +59,17 @@ func parse(link string) {
 	}
 
 	if wf.Cache.Expired(cacheKey, maxCacheAge) {
-		resp, err := http.Get(link)
+
+		client := &http.Client{}
+		req, err := http.NewRequest("GET", link, nil)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.128 Safari/537.36")
+
+		resp, err := client.Do(req)
+
 		if err != nil {
 			wf.NewItem("error").Subtitle(err.Error())
 			wf.SendFeedback()
@@ -71,7 +82,7 @@ func parse(link string) {
 	wf.Cache.StoreJSON(cacheKey, meta)
 	meta.Title = pureTitle(meta.Title)
 
-	item := wf.NewItem(fmt.Sprintf("%s [%s]", meta.Title, meta.SiteName)).Subtitle(meta.Description).Valid(true).Var("url", link).Var("title", meta.Title).Var("description", meta.Description).Var("image", meta.Image).Var("siteName", meta.SiteName).Quicklook(link)
+	item := wf.NewItem(fmt.Sprintf("%s [%s]", meta.Title, meta.SiteName)).Subtitle(pureDescription(meta.Description)).Valid(true).Var("url", link).Var("title", meta.Title).Var("description", pureDescription(meta.Description)).Var("image", meta.Image).Var("siteName", meta.SiteName).Quicklook(link)
 	item.Ctrl().Subtitle("复制到 Markdown")
 	wf.SendFeedback()
 }
@@ -147,7 +158,7 @@ func extractMetaProperty(t html.Token, prop string) (content string, ok bool) {
 		if attr.Key == "property" && attr.Val == prop {
 			ok = true
 		}
-
+		log.Printf("arr=%s, %s", attr.Key, attr.Val)
 		if attr.Key == "name" && strings.ToLower(attr.Val) == prop {
 			ok = true
 		}
@@ -156,6 +167,7 @@ func extractMetaProperty(t html.Token, prop string) (content string, ok bool) {
 			content = attr.Val
 		}
 	}
+	log.Printf("extractMetaProperty(%s, %s)=%s, %t", t, prop, content, ok)
 	return
 }
 
@@ -167,6 +179,12 @@ func pureTitle(title string) string {
 		return str
 	}
 	return strings.Join(ss[:len(ss)-1], "")
+}
+
+func pureDescription(description string) string {
+	re := regexp.MustCompile(`[\r\n\s]+`)
+	str := re.ReplaceAllString(description, " ")
+	return str
 }
 
 func parseSiteNameFromTitle(title string) string {
