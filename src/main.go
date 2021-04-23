@@ -73,8 +73,8 @@ func parse(link string) {
 	}
 
 	wf.Cache.StoreJSON(cacheKey, meta)
-	meta.Title = cleanBreak(pureTitle(meta.Title))
-	meta.Description = cleanBreak(meta.Description)
+	meta.Title = break2space(pureTitle(meta.Title))
+	meta.Description = break2space(meta.Description)
 	item := wf.NewItem(fmt.Sprintf("%s [%s]", meta.Title, meta.SiteName)).Subtitle(meta.Description).Valid(true).Var("url", link).Var("title", meta.Title).Var("description", meta.Description).Var("image", meta.Image).Var("siteName", meta.SiteName).Quicklook(link)
 	item.Ctrl().Subtitle("复制到 Markdown")
 	wf.SendFeedback()
@@ -145,7 +145,7 @@ func extract(resp io.Reader) *HTMLMeta {
 
 				ogSiteName, ok := extractMetaProperty(t, "og:site_name")
 				if ok {
-					hm.SiteName = ogSiteName
+					hm.SiteName = cleanBreak(ogSiteName)
 				}
 			}
 		case html.TextToken:
@@ -181,8 +181,8 @@ func extractMetaProperty(t html.Token, prop string) (content string, ok bool) {
 }
 
 func pureTitle(title string) string {
-	str := strings.ReplaceAll(title, "_", "-")
-	str = strings.ReplaceAll(str, " ", "")
+	str := regexp.MustCompile(`[_－|]+`).ReplaceAllString(title, "-")
+	str = regexp.MustCompile(`[\s]+`).ReplaceAllString(str, "")
 	ss := strings.Split(str, "-")
 	if len(ss) <= 1 {
 		return str
@@ -191,16 +191,15 @@ func pureTitle(title string) string {
 }
 
 func cleanBreak(description string) string {
-	re := regexp.MustCompile(`[\r\n\s]+`)
-	str := re.ReplaceAllString(description, " ")
-	return str
+	return regexp.MustCompile(`[\r\n\s]+`).ReplaceAllString(description, "")
+}
+
+func break2space(description string) string {
+	return regexp.MustCompile(`[\r\n\s]+`).ReplaceAllString(description, " ")
 }
 
 func parseSiteNameFromTitle(title string) string {
-	str := strings.ReplaceAll(cleanBreak(title), "_", "-")
-	str = strings.ReplaceAll(str, " ", "")
-	str = strings.ReplaceAll(str, "－", "-")
-	str = strings.ReplaceAll(str, "|", "-")
+	str := regexp.MustCompile(`[_－|\s]+`).ReplaceAllString(break2space(title), "-")
 	ss := strings.Split(str, "-")
 	log.Printf("str=%s\n", str)
 	return ss[len(ss)-1]
